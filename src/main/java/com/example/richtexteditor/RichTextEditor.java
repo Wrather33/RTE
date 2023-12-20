@@ -3,16 +3,11 @@ package com.example.richtexteditor;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.event.Event;
-import javafx.event.EventType;
-import javafx.geometry.Bounds;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.Clipboard;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.web.WebEngine;
@@ -21,7 +16,6 @@ import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import org.jsoup.helper.W3CDom;
-import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import java.io.*;
 import org.jsoup.*;
@@ -33,9 +27,9 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.ArrayList;
-import java.util.ListIterator;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 
@@ -43,10 +37,12 @@ public class RichTextEditor extends Application {
     AtomicBoolean push = new AtomicBoolean(true);
     AtomicBoolean created = new AtomicBoolean(false);
     static AtomicReference<File> chooseFile = new AtomicReference<>();
+
     @Override
     public void start(Stage stage) throws IOException {
         FileLibrary fileLibrary = FileLibrary.getFileLibrary();
         WebView webView = new WebView();
+        VBox selected = new VBox();
         Button undo = new Button("undo");
         Button redo = new Button("redo");
         Button rename = new Button("Rename");
@@ -75,16 +71,18 @@ public class RichTextEditor extends Application {
         scrollPane.setFitToHeight(true);
         fileNames.setFillHeight(true);
        panel.setAlignment(Pos.CENTER);
-        vBox.getChildren().addAll(buttons, ControlBox, files, scrollPane, panel);
+        vBox.getChildren().addAll(buttons, ControlBox, files, scrollPane, panel, selected);
         panel.setAlignment(Pos.CENTER);
         files.setAlignment(Pos.CENTER);
         TextArea redact = new TextArea();
+        Button find = new Button("Find");
         Button copy = new Button("Copy");
         Button paste = new Button("Paste");
         Button cut = new Button("Cut");
         Button delete = new Button("Delete");
         Button replace = new Button("Replace");
         Button select = new Button("Select All");
+        find.setDisable(true);
         copy.setDisable(true);
         paste.setDisable(true);
         cut.setDisable(true);
@@ -93,6 +91,8 @@ public class RichTextEditor extends Application {
         select.setDisable(true);
         MenuButton edit = new MenuButton("Edit");
         MenuItem Mcopy = new MenuItem();
+        MenuItem Mfind = new MenuItem();
+        Mfind.setGraphic(find);
         Mcopy.setGraphic(copy);
         MenuItem Mpaste = new MenuItem();
         Mpaste.setGraphic(paste);
@@ -104,7 +104,7 @@ public class RichTextEditor extends Application {
         Mreplace.setGraphic(replace);
         MenuItem Mselect = new MenuItem();
         Mselect.setGraphic(select);
-        edit.getItems().addAll(Mcopy, Mpaste, Mcut, Mdelete, Mreplace, Mselect);
+        edit.getItems().addAll(Mcopy, Mpaste, Mcut, Mdelete, Mreplace, Mselect, Mfind);
         MenuButton m = new MenuButton("File");
         MenuItem menuItem = new MenuItem();
         menuItem.setGraphic(open);
@@ -140,6 +140,7 @@ public class RichTextEditor extends Application {
         buttonsContainer.setAlignment(Pos.CENTER);
         buttons.getChildren().addAll(buttonsContainer);
         redact.textProperty().addListener((observable, oldValue, newValue) -> {
+            selected.getChildren().clear();
             if(webEngine.getDocument()!= null){
                 String doc = Jsoup.parse(redact.getText()).outerHtml();
                 webEngine.executeScript("document.querySelector('html').innerHTML ="+"`"+doc+"`");
@@ -152,6 +153,7 @@ public class RichTextEditor extends Application {
                         .findFirst()
                         .orElse(null);
                 if(appFile != null){
+                    selected.getChildren().clear();
                     appFile.setDocument(redact.getText(), push.get());
                     push.set(true);
                 }
@@ -207,6 +209,74 @@ public class RichTextEditor extends Application {
                         redact.replaceSelection(text.get());
                     }}
             });
+            find.setOnAction(event -> {
+                selected.getChildren().clear();
+                TextInputDialog textInputDialog = new TextInputDialog(redact.getSelectedText());
+                textInputDialog.setHeaderText("find text");
+                Optional<String> text = textInputDialog.showAndWait();
+                String result = textInputDialog.getEditor().getText();
+                if(text.isPresent() && !textInputDialog.getEditor().getText().isEmpty() &&
+                        !result.equals(redact.getSelectedText())){
+                    ArrayList<Integer> indexes = new ArrayList<>();
+                    String textfromarea = redact.getText();
+                    int start = 0;
+                    while (true){
+                        if(textfromarea.indexOf(text.get(), start) != -1)
+                        {
+                            indexes.add(textfromarea.indexOf(text.get(), start));
+                            start = textfromarea.indexOf(text.get(), start)+text.get().length();
+                        }
+                        else {
+                            break;
+                        }
+
+                    }
+                    if(!indexes.isEmpty()) {
+                        redact.selectRange(indexes.get(0), indexes.get(0)+text.get().length());
+                        Label len = new Label(String.format("%d/%d", 1, indexes.size()));
+                        Button exit = new Button("X");
+                        HBox hBox = new HBox(len, exit);
+                        Button next = new Button("next");
+                        Button prev = new Button("prev");
+                        HBox hBox1 = new HBox(prev, next);
+                        selected.getChildren().addAll(hBox, hBox1);
+                        selected.setAlignment(Pos.CENTER);
+                        hBox.setAlignment(Pos.CENTER);
+                        hBox1.setAlignment(Pos.CENTER);
+                        if(indexes.size() > 1) {
+                            prev.setDisable(true);
+                        }
+                        else {
+                            prev.setDisable(true);
+                            next.setDisable(true);
+                        }
+                        AtomicInteger inx = new AtomicInteger();
+                        AtomicInteger crt = new AtomicInteger();
+                        crt.set(1);
+                        next.setOnAction(event1 -> {
+                            prev.setDisable(false);
+                            int found = indexes.get(inx.incrementAndGet());
+                            redact.selectRange(found, found + text.get().length());
+                            len.setText(String.format("%d/%d", crt.incrementAndGet(), indexes.size()));
+                            if (crt.get() == indexes.size()) {
+                                next.setDisable(true);
+                            }
+                        });
+                        prev.setOnAction(event1 -> {
+                            next.setDisable(false);
+                            int found = indexes.get(inx.decrementAndGet());
+                            redact.selectRange(found, found + text.get().length());
+                            len.setText(String.format("%d/%d", crt.decrementAndGet(), indexes.size()));
+                            if (crt.get() == 1) {
+                                prev.setDisable(true);
+                            }
+                        });
+                        exit.setOnAction(event1 -> {
+                            selected.getChildren().clear();
+                        });
+                    }
+                }
+            });
             undo.setOnAction(event -> {
                 if(chooseFile.get() != null) {
                     AppFile appFile = fileLibrary.getFiles().stream()
@@ -240,6 +310,7 @@ public class RichTextEditor extends Application {
                     .orElse(null);
             if(appFile != null){
                 assert appFile != null;
+                selected.getChildren().clear();
                 appFile.setDocument(textArea.getText(), push.get());
                 push.set(true);
                 undo.setDisable(!appFile.canUndo());
@@ -323,6 +394,74 @@ public class RichTextEditor extends Application {
                 select.setOnAction(event -> {
                     textArea.selectAll();
                 });
+                find.setOnAction(event -> {
+                    selected.getChildren().clear();
+                        TextInputDialog textInputDialog = new TextInputDialog(textArea.getSelectedText());
+                        textInputDialog.setHeaderText("find text");
+                        Optional<String> text = textInputDialog.showAndWait();
+                        String result = textInputDialog.getEditor().getText();
+                        if(text.isPresent() && !textInputDialog.getEditor().getText().isEmpty() &&
+                                !result.equals(textArea.getSelectedText())){
+                            ArrayList<Integer> indexes = new ArrayList<>();
+                            String textfromarea = textArea.getText();
+                            int start = 0;
+                            while (true){
+                                if(textfromarea.indexOf(text.get(), start) != -1)
+                                {
+                                    indexes.add(textfromarea.indexOf(text.get(), start));
+                                    start = textfromarea.indexOf(text.get(), start)+text.get().length();
+                            }
+                                else {
+                                    break;
+                                }
+
+                        }
+                            if(!indexes.isEmpty()) {
+                                textArea.selectRange(indexes.get(0), indexes.get(0)+text.get().length());
+                                Label len = new Label(String.format("%d/%d", 1, indexes.size()));
+                                Button exit = new Button("X");
+                                HBox hBox = new HBox(len, exit);
+                                Button next = new Button("next");
+                                Button prev = new Button("prev");
+                                HBox hBox1 = new HBox(prev, next);
+                                selected.getChildren().addAll(hBox, hBox1);
+                                selected.setAlignment(Pos.CENTER);
+                                hBox.setAlignment(Pos.CENTER);
+                                hBox1.setAlignment(Pos.CENTER);
+                                if(indexes.size() > 1) {
+                                    prev.setDisable(true);
+                                }
+                                else {
+                                    prev.setDisable(true);
+                                    next.setDisable(true);
+                                }
+                                AtomicInteger inx = new AtomicInteger();
+                                AtomicInteger crt = new AtomicInteger();
+                                crt.set(1);
+                                next.setOnAction(event1 -> {
+                                        prev.setDisable(false);
+                                        int found = indexes.get(inx.incrementAndGet());
+                                        textArea.selectRange(found, found + text.get().length());
+                                        len.setText(String.format("%d/%d", crt.incrementAndGet(), indexes.size()));
+                                        if (crt.get() == indexes.size()) {
+                                            next.setDisable(true);
+                                        }
+                                });
+                                prev.setOnAction(event1 -> {
+                                        next.setDisable(false);
+                                        int found = indexes.get(inx.decrementAndGet());
+                                        textArea.selectRange(found, found + text.get().length());
+                                        len.setText(String.format("%d/%d", crt.decrementAndGet(), indexes.size()));
+                                        if (crt.get() == 1) {
+                                            prev.setDisable(true);
+                                        }
+                                });
+                                exit.setOnAction(event1 -> {
+                                    selected.getChildren().clear();
+                                });
+                            }
+                        }
+                });
                 replace.setOnAction(event -> {
                     if(!textArea.getSelectedText().isEmpty()) {
                         TextInputDialog textInputDialog = new TextInputDialog(textArea.getSelectedText());
@@ -332,6 +471,7 @@ public class RichTextEditor extends Application {
                         if(text.isPresent() && !textInputDialog.getEditor().getText().isEmpty() &&
                                 !result.equals(textArea.getSelectedText())){
                         textArea.replaceSelection(text.get());
+
                     }}
                 });
                 undo.setOnAction(event -> {
@@ -411,6 +551,8 @@ public class RichTextEditor extends Application {
                             } else {
                                 throw new IOException();
                             }
+                            selected.getChildren().clear();
+                            find.setDisable(false);
                             copy.setDisable(false);
                             paste.setDisable(false);
                             cut.setDisable(false);
@@ -444,9 +586,11 @@ public class RichTextEditor extends Application {
                                                 throw new RuntimeException(e);
                                             }
                                         }
+                                selected.getChildren().clear();
                                 fileLibrary.RemoveFile(remove.getFile());
                                 fileNames.getChildren().remove(storageHbox);
                                 if(fileLibrary.getFiles().isEmpty()){
+                                    find.setDisable(true);
                                     copy.setDisable(true);
                                     paste.setDisable(true);
                                     cut.setDisable(true);
@@ -522,6 +666,7 @@ public class RichTextEditor extends Application {
                                         } else {
                                             throw new IOException();
                                         }
+                                    selected.getChildren().clear();
                                     undo.setDisable(true);
                                     redo.setDisable(true);
                                     } catch(IOException e){
@@ -719,7 +864,6 @@ public class RichTextEditor extends Application {
             }
         }
     }
-
     public static void main(String[] args) {
         launch();
     }
