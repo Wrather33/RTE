@@ -218,13 +218,14 @@ public class RichTextEditor extends Application {
                 if(text.isPresent() && !textInputDialog.getEditor().getText().isEmpty() &&
                         !result.equals(redact.getSelectedText())){
                     ArrayList<Integer> indexes = new ArrayList<>();
-                    String textfromarea = redact.getText();
+                    String textfromarea = redact.getText().toLowerCase();
+                    String redtext = text.get().toLowerCase();
                     int start = 0;
                     while (true){
-                        if(textfromarea.indexOf(text.get(), start) != -1)
+                        if(textfromarea.indexOf(redtext, start) != -1)
                         {
-                            indexes.add(textfromarea.indexOf(text.get(), start));
-                            start = textfromarea.indexOf(text.get(), start)+text.get().length();
+                            indexes.add(textfromarea.indexOf(redtext, start));
+                            start = textfromarea.indexOf(redtext, start)+redtext.length();
                         }
                         else {
                             break;
@@ -232,7 +233,7 @@ public class RichTextEditor extends Application {
 
                     }
                     if(!indexes.isEmpty()) {
-                        redact.selectRange(indexes.get(0), indexes.get(0)+text.get().length());
+                        redact.selectRange(indexes.get(0), indexes.get(0)+redtext.length());
                         Label len = new Label(String.format("%d/%d", 1, indexes.size()));
                         Button exit = new Button("X");
                         HBox hBox = new HBox(len, exit);
@@ -256,7 +257,7 @@ public class RichTextEditor extends Application {
                         next.setOnAction(event1 -> {
                             prev.setDisable(false);
                             int found = indexes.get(inx.incrementAndGet());
-                            redact.selectRange(found, found + text.get().length());
+                            redact.selectRange(found, found + redtext.length());
                             len.setText(String.format("%d/%d", crt.incrementAndGet(), indexes.size()));
                             if (crt.get() == indexes.size()) {
                                 next.setDisable(true);
@@ -265,7 +266,7 @@ public class RichTextEditor extends Application {
                         prev.setOnAction(event1 -> {
                             next.setDisable(false);
                             int found = indexes.get(inx.decrementAndGet());
-                            redact.selectRange(found, found + text.get().length());
+                            redact.selectRange(found, found + redtext.length());
                             len.setText(String.format("%d/%d", crt.decrementAndGet(), indexes.size()));
                             if (crt.get() == 1) {
                                 prev.setDisable(true);
@@ -403,13 +404,14 @@ public class RichTextEditor extends Application {
                         if(text.isPresent() && !textInputDialog.getEditor().getText().isEmpty() &&
                                 !result.equals(textArea.getSelectedText())){
                             ArrayList<Integer> indexes = new ArrayList<>();
-                            String textfromarea = textArea.getText();
+                            String textfromarea = textArea.getText().toLowerCase();
+                            String redtext = text.get().toLowerCase();
                             int start = 0;
                             while (true){
-                                if(textfromarea.indexOf(text.get(), start) != -1)
+                                if(textfromarea.indexOf(redtext, start) != -1)
                                 {
-                                    indexes.add(textfromarea.indexOf(text.get(), start));
-                                    start = textfromarea.indexOf(text.get(), start)+text.get().length();
+                                    indexes.add(textfromarea.indexOf(redtext, start));
+                                    start = textfromarea.indexOf(redtext, start)+redtext.length();
                             }
                                 else {
                                     break;
@@ -417,7 +419,7 @@ public class RichTextEditor extends Application {
 
                         }
                             if(!indexes.isEmpty()) {
-                                textArea.selectRange(indexes.get(0), indexes.get(0)+text.get().length());
+                                textArea.selectRange(indexes.get(0), indexes.get(0)+redtext.length());
                                 Label len = new Label(String.format("%d/%d", 1, indexes.size()));
                                 Button exit = new Button("X");
                                 HBox hBox = new HBox(len, exit);
@@ -441,7 +443,7 @@ public class RichTextEditor extends Application {
                                 next.setOnAction(event1 -> {
                                         prev.setDisable(false);
                                         int found = indexes.get(inx.incrementAndGet());
-                                        textArea.selectRange(found, found + text.get().length());
+                                        textArea.selectRange(found, found + redtext.length());
                                         len.setText(String.format("%d/%d", crt.incrementAndGet(), indexes.size()));
                                         if (crt.get() == indexes.size()) {
                                             next.setDisable(true);
@@ -450,7 +452,7 @@ public class RichTextEditor extends Application {
                                 prev.setOnAction(event1 -> {
                                         next.setDisable(false);
                                         int found = indexes.get(inx.decrementAndGet());
-                                        textArea.selectRange(found, found + text.get().length());
+                                        textArea.selectRange(found, found + redtext.length());
                                         len.setText(String.format("%d/%d", crt.decrementAndGet(), indexes.size()));
                                         if (crt.get() == 1) {
                                             prev.setDisable(true);
